@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Runner Pro</title>
+<style>
+body { margin:0; overflow:hidden; font-family:Arial; background:#222; }
+canvas { display:block; margin:auto; background:linear-gradient(#87CEEB,#fff); }
+#startScreen, #gameOverScreen {
+  position:absolute; top:0; left:0; width:100%; height:100%;
+  display:flex; flex-direction:column; justify-content:center; align-items:center;
+  background:rgba(0,0,0,0.7); color:white;
+}
+button { padding:10px 20px; font-size:18px; margin-top:10px; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<canvas id="game"></canvas>
+
+<div id="startScreen">
+  <h1>🏃 Runner Pro</h1>
+  <button onclick="startGame()">Start Game</button>
+</div>
+
+<div id="gameOverScreen" style="display:none;">
+  <h1>Game Over</h1>
+  <p id="finalScore"></p>
+  <button onclick="restartGame()">Restart</button>
+</div>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = 400;
+
+let gameRunning = false;
+
+// Player
+let player = { x:100, y:300, w:40, h:40, dy:0, gravity:0.8, jump:-15, grounded:true };
+
+// Game
+let obstacles = [], coins = [], powerups = [];
+let speed = 6, score = 0, level = 1;
+let powerMode = false, powerTimer = 0;
+
+// Sounds
+let jumpSound = new Audio("https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg");
+let coinSound = new Audio("https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg");
+let hitSound = new Audio("https://actions.google.com/sounds/v1/impacts/crash.ogg");
+
+// Controls
+document.addEventListener("keydown", e => {
+  if (e.code === "Space" && player.grounded && gameRunning) {
+    player.dy = player.jump;
+    player.grounded = false;
+    jumpSound.play();
+  }
+});
+
+// Mobile tap
+canvas.addEventListener("touchstart", () => {
+  if (player.grounded && gameRunning) {
+    player.dy = player.jump;
+    player.grounded = false;
+    jumpSound.play();
+  }
+});
+
+// Start
+function startGame() {
+  document.getElementById("startScreen").style.display = "none";
+  gameRunning = true;
+  update();
+}
+
+// Restart
+function restartGame() {
+  obstacles = []; coins = []; powerups = [];
+  speed = 6; score = 0; level = 1;
+  powerMode = false;
+  player.y = 300;
+  document.getElementById("gameOverScreen").style.display = "none";
+  gameRunning = true;
+  update();
+}
+
+// Loop
+function update() {
+  if (!gameRunning) return;
+
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  // Ground
+  ctx.fillStyle = "#654321";
+  ctx.fillRect(0,340,canvas.width,60);
+
+  // Player physics
+  player.dy += player.gravity;
+  player.y += player.dy;
+  if (player.y >= 300) { player.y = 300; player.dy = 0; player.grounded = true; }
+
+  // Spawn
+  if (Math.random() < 0.02) obstacles.push({x:canvas.width,y:300,w:30,h:40});
+  if (Math.random() < 0.02) coins.push({x:canvas.width,y:250,w:15,h:15});
+  if (Math.random() < 0.005) powerups.push({x:canvas.width,y:260,w:20,h:20});
+
+  // Move
+  obstacles.forEach(o => o.x -= speed);
+  coins.forEach(c => c.x -= speed);
+  powerups.forEach(p => p.x -= speed);
+
+  // Collision
+  obstacles.forEach(o => {
+    if (player.x < o.x+o.w && player.x+player.w > o.x &&
+        player.y < o.y+o.h && player.y+player.h > o.y) {
+      if (!powerMode) endGame();
+    }
+  });
+
+  coins.forEach((c,i) => {
+    if (player.x < c.x+c.w && player.x+player.w > c.x &&
+        player.y < c.y+c.h && player.y+player.h > c.y) {
+      score += 50;
+      coinSound.play();
+      coins.splice(i,1);
+    }
+  });
+
+  powerups.forEach((p,i) => {
+    if (player.x < p.x+p.w && player.x+player.w > p.x &&
+        player.y < p.y+p.h && player.y+player.h > p.y) {
+      powerMode = true;
+      powerTimer = 200;
+      powerups.splice(i,1);
+    }
+  });
+
+  if (powerMode) {
+    powerTimer--;
+    if (powerTimer <= 0) powerMode = false;
+  }
+
+  // Score
+  score++;
+  if (score % 500 === 0) { level++; speed++; }
+
+  // Draw player
+  ctx.fillStyle = powerMode ? "blue" : "black";
+  ctx.fillRect(player.x, player.y, player.w, player.h);
+
+  // Draw
+  ctx.fillStyle = "red"; obstacles.forEach(o => ctx.fillRect(o.x,o.y,o.w,o.h));
+  ctx.fillStyle = "gold"; coins.forEach(c => ctx.fillRect(c.x,c.y,c.w,c.h));
+  ctx.fillStyle = "green"; powerups.forEach(p => ctx.fillRect(p.x,p.y,p.w,p.h));
+
+  // UI
+  ctx.fillStyle = "black";
+  ctx.fillText("Score: "+score,20,30);
+  ctx.fillText("Level: "+level,20,60);
+
+  requestAnimationFrame(update);
+}
+
+function endGame() {
+  gameRunning = false;
+  hitSound.play();
+  document.getElementById("gameOverScreen").style.display = "flex";
+  document.getElementById("finalScore").innerText = "Score: " + score;
+}
+</script>
+
+</body>
+</html>
